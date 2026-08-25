@@ -5,7 +5,7 @@ import api from '../api/axios';
 import toast from 'react-hot-toast';
 import ConfirmationModal from '../components/ui/ConfirmationModal';
 
-export default function ProviderSettings({ isStandalone = true }) {
+export default function cleanersSettings({ isStandalone = true }) {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('account');
@@ -65,7 +65,7 @@ export default function ProviderSettings({ isStandalone = true }) {
         toast.success(res.data.message || 'Account deactivated successfully.');
         setIsDeactivateModalOpen(false);
         await logout();
-        navigate('/');
+        navigate('/login');
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to deactivate account.');

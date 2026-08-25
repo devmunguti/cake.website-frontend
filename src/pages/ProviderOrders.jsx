@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { orderApi } from '../api/orderApi';
 import toast from 'react-hot-toast';
 
-export default function ProviderOrders({ isStandalone = true }) {
+export default function cleanersOrders({ isStandalone = true }) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('orders');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);

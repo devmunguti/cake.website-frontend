@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { reviewApi } from '../api/reviewApi';
 import toast from 'react-hot-toast';
 
-export default function ProviderReviews({ isStandalone = true }) {
+export default function cleanersReviews({ isStandalone = true }) {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [ratingFilter, setRatingFilter] = useState('all');

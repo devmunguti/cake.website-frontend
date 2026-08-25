@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
-import { useAuth } from '../hooks/useAuth';
 import { serviceApi } from '../api/serviceApi';
 import { promotionApi } from '../api/promotionApi';
 import { SkeletonCard } from '../components/ui/Skeleton';
@@ -10,11 +9,9 @@ import EmptyState from '../components/ui/EmptyState';
 export default function HomePage() {
   const navigate = useNavigate();
   const { settings } = useSettings();
-  const { user, isAuthenticated } = useAuth();
 
-  const [activeNav, setActiveNav] = useState('discover');
   const [searchQuery, setSearchQuery] = useState('');
-  const [location, setLocation] = useState('Nairobi, KE');
+  const [location] = useState('Nairobi, KE');
   const [favorites, setFavorites] = useState({});
 
   const [services, setServices] = useState([]);

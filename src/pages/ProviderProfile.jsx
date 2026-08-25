@@ -3,7 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import { systemSettingsApi } from '../api/systemSettingsApi';
 import toast from 'react-hot-toast';
 
-export default function ProviderProfile({ isStandalone = true }) {
+export default function cleanersProfile({ isStandalone = true }) {
   const { user } = useAuth();
   const [commissionRate, setCommissionRate] = useState(15);
   const [profile, setProfile] = useState({
