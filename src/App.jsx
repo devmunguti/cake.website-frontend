@@ -3,100 +3,63 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster, toast } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SettingsProvider, useSettings } from './context/SettingsContext';
+import { CartProvider } from './context/CartContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Navbar from './components/layout/Navbar';
+import Footer from './components/layout/Footer';
+import CartDrawer from './components/layout/CartDrawer';
 import './App.css';
 
-// Lazy-loaded pages for bundle optimization & performance
+// Lazy-loaded pages
 const HomePage = lazy(() => import('./pages/HomePage'));
+const CakesPage = lazy(() => import('./pages/CakesPage'));
+const CakeDetailsPage = lazy(() => import('./pages/CakeDetailsPage'));
+const CustomCakePage = lazy(() => import('./pages/CustomCakePage'));
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'));
 const TrackOrderPage = lazy(() => import('./pages/TrackOrderPage'));
 const ReviewsPage = lazy(() => import('./pages/ReviewsPage'));
+const MyOrdersPage = lazy(() => import('./pages/MyOrdersPage'));
 const PortalGateway = lazy(() => import('./pages/PortalGateway'));
-const ProviderPortal = lazy(() => import('./pages/ProviderPortal'));
 const AdminPortal = lazy(() => import('./pages/AdminPortal'));
-const ForcePasswordChange = lazy(() => import('./pages/ForcePasswordChange'));
-const ProviderNavigationPage = lazy(() => import('./pages/ProviderNavigationPage'));
-const CleanerShopPage = lazy(() => import('./pages/CleanerShopPage'));
 
 function PageLoader() {
   return (
-    <div className="min-h-[60vh] flex flex-col items-center justify-center p-8 text-center animate-fadeIn">
-      <div className="w-12 h-12 rounded-full border-4 border-primary border-t-transparent animate-spin mb-4" />
-      <p className="font-headline-md text-sm font-semibold text-on-surface">Loading page...</p>
-    </div>
-  );
-}
-
-function OfflineBanner() {
-  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
-
-  useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      toast.success('Internet connection restored.');
-    };
-    const handleOffline = () => {
-      setIsOnline(false);
-      toast.error('Internet connection lost. You are currently offline.');
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  if (isOnline) return null;
-
-  return (
-    <div className="bg-amber-600 text-white font-label-md px-4 py-2.5 text-center flex items-center justify-center gap-2 shadow-md z-50 sticky top-0">
-      <span className="material-symbols-outlined text-[18px]">wifi_off</span>
-      <span>
-        <strong>You are offline:</strong> Some real-time order updates and payment operations may be delayed.
-      </span>
+    <div className="min-h-[60vh] flex flex-col items-center justify-center p-8 text-center animate-fadeIn bg-[#FAF7F2]">
+      <div className="w-12 h-12 rounded-full border-4 border-[#C85A32] border-t-transparent animate-spin mb-4" />
+      <p className="font-serif-display text-sm font-semibold text-[#2C2420]">Baking sweet experiences...</p>
     </div>
   );
 }
 
 function MaintenanceBanner() {
-  const { maintenanceTriggered, settings } = useSettings();
+  const { settings } = useSettings();
   const { user } = useAuth();
 
-  if (!maintenanceTriggered && !settings?.maintenanceMode) return null;
-  if (user && user.role === 'admin') return null; // Admins bypass maintenance banner
+  if (!settings?.maintenanceMode) return null;
+  if (user && user.role === 'admin') return null; // Admin bypass
 
   return (
-    <div className="bg-amber-500 text-slate-900 font-label-md px-4 py-3 text-center flex items-center justify-center gap-2 shadow-md">
-      <span className="material-symbols-outlined text-[20px]">engineering</span>
+    <div className="bg-amber-500 text-slate-900 font-bold text-xs px-4 py-3 text-center flex items-center justify-center gap-2 shadow-md">
+      <span className="material-symbols-outlined text-[18px]">engineering</span>
       <span>
-        <strong>Scheduled Maintenance:</strong> {settings?.platformName || 'Laundry'} is currently undergoing system updates. Customer order placements are temporarily restricted.
+        <strong>Notice:</strong> {settings?.platformName || 'Sweet Delights Bakery'} is currently undergoing scheduled kitchen maintenance. Cake orders are temporarily paused.
       </span>
     </div>
   );
 }
 
+function Layout({ children }) {
+  return (
+    <div className="flex flex-col min-h-screen">
+      <Navbar />
+      <main className="flex-1">{children}</main>
+      <Footer />
+      <CartDrawer />
+    </div>
+  );
+}
+
 function AppContent() {
-  useEffect(() => {
-    const handleUnauthorized = (e) => {
-      toast.error(e.detail || 'Session expired. Please sign in again.', { id: 'unauthorized-toast' });
-    };
-    const handleNetworkError = (e) => {
-      toast.error(e.detail || 'Network error. Please check your connection.', { id: 'network-error-toast' });
-    };
-
-    window.addEventListener('platform:unauthorized', handleUnauthorized);
-    window.addEventListener('platform:network-error', handleNetworkError);
-
-    return () => {
-      window.removeEventListener('platform:unauthorized', handleUnauthorized);
-      window.removeEventListener('platform:network-error', handleNetworkError);
-    };
-  }, []);
-
   return (
     <>
       <Toaster
@@ -104,12 +67,12 @@ function AppContent() {
         toastOptions={{
           duration: 4000,
           style: {
-            background: '#1e293b',
-            color: '#f8fafc',
+            background: '#2C2420',
+            color: '#FAF7F2',
             borderRadius: '16px',
             fontSize: '13px',
-            fontWeight: '500',
-            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.2)',
+            fontWeight: '600',
+            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.2)',
             padding: '12px 18px',
           },
           success: {
@@ -126,86 +89,117 @@ function AppContent() {
           },
         }}
       />
-      <OfflineBanner />
       <MaintenanceBanner />
       <Router>
         <Suspense fallback={<PageLoader />}>
           <Routes>
-            {/* Customer Facing & Authentication Routes */}
+            {/* Public & Customer Storefront Routes */}
             <Route
               path="/"
               element={
-                <div className="app-container">
-                  <Navbar />
-                  <main>
-                    <HomePage />
-                  </main>
-                </div>
+                <Layout>
+                  <HomePage />
+                </Layout>
               }
             />
-            <Route path="/cleaner/:providerId" element={<CleanerShopPage />} />
-            <Route path="/shop/:providerId" element={<CleanerShopPage />} />
-            <Route path="/checkout" element={<CheckoutPage />} />
-            <Route path="/track-order/:orderRef" element={<TrackOrderPage />} />
-            <Route path="/reviews" element={<ReviewsPage />} />
-            <Route path="/login" element={<PortalGateway />} />
-            <Route path="/portal" element={<PortalGateway />} />
             <Route
-              path="/force-password-change"
+              path="/cakes"
               element={
-                <ProtectedRoute allowedRoles={['provider']}>
-                  <ForcePasswordChange />
+                <Layout>
+                  <CakesPage />
+                </Layout>
+              }
+            />
+            <Route
+              path="/cakes/:slug"
+              element={
+                <Layout>
+                  <CakeDetailsPage />
+                </Layout>
+              }
+            />
+            <Route
+              path="/custom-cake"
+              element={
+                <Layout>
+                  <CustomCakePage />
+                </Layout>
+              }
+            />
+            <Route
+              path="/checkout"
+              element={
+                <Layout>
+                  <CheckoutPage />
+                </Layout>
+              }
+            />
+            <Route
+              path="/track-order"
+              element={
+                <Layout>
+                  <TrackOrderPage />
+                </Layout>
+              }
+            />
+            <Route
+              path="/track-order/:orderRef"
+              element={
+                <Layout>
+                  <TrackOrderPage />
+                </Layout>
+              }
+            />
+            <Route
+              path="/reviews"
+              element={
+                <Layout>
+                  <ReviewsPage />
+                </Layout>
+              }
+            />
+            <Route
+              path="/my-orders"
+              element={
+                <ProtectedRoute allowedRoles={['customer', 'user', 'admin']}>
+                  <Layout>
+                    <MyOrdersPage />
+                  </Layout>
                 </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/login"
+              element={
+                <Layout>
+                  <PortalGateway />
+                </Layout>
+              }
+            />
+            <Route
+              path="/portal"
+              element={
+                <Layout>
+                  <PortalGateway />
+                </Layout>
               }
             />
 
-            {/* Provider Portal Single Unified Page Route (Protected) */}
+            {/* Admin Command Center (Protected) */}
             <Route
-              path="/provider"
-              element={
-                <ProtectedRoute allowedRoles={['provider', 'cleaner']}>
-                  <ProviderPortal />
-                </ProtectedRoute>
-              }
-            />
-            {/* Provider Live Navigation Route */}
-            <Route
-              path="/provider/navigate/:orderId"
-              element={
-                <ProtectedRoute allowedRoles={['provider', 'cleaner', 'admin']}>
-                  <ProviderNavigationPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="/provider/portal" element={<Navigate to="/provider" replace />} />
-            <Route path="/provider/dashboard" element={<Navigate to="/provider?tab=dashboard" replace />} />
-            <Route path="/provider/orders" element={<Navigate to="/provider?tab=orders" replace />} />
-            <Route path="/provider/services" element={<Navigate to="/provider?tab=services" replace />} />
-            <Route path="/provider/promotions" element={<Navigate to="/provider?tab=promotions" replace />} />
-            <Route path="/provider/reviews" element={<Navigate to="/provider?tab=reviews" replace />} />
-            <Route path="/provider/earnings" element={<Navigate to="/provider?tab=earnings" replace />} />
-            <Route path="/provider/payment-channels" element={<Navigate to="/provider?tab=payment-channels" replace />} />
-            <Route path="/provider/profile" element={<Navigate to="/provider?tab=profile" replace />} />
-            <Route path="/provider/settings" element={<Navigate to="/provider?tab=settings" replace />} />
-
-            {/* Admin Portal Routes (Protected) */}
-            <Route
-              path="/admin"
+              path="/admin/*"
               element={
                 <ProtectedRoute allowedRoles={['admin']}>
                   <AdminPortal />
                 </ProtectedRoute>
               }
             />
-            <Route path="/admin/portal" element={<Navigate to="/admin" replace />} />
-            <Route path="/admin/overview" element={<Navigate to="/admin?tab=overview" replace />} />
-            <Route path="/admin/provider-management" element={<Navigate to="/admin?tab=provider-management" replace />} />
-            <Route path="/admin/order-management" element={<Navigate to="/admin?tab=order-management" replace />} />
-            <Route path="/admin/ticket-management" element={<Navigate to="/admin?tab=ticket-management" replace />} />
-            <Route path="/admin/promotions-management" element={<Navigate to="/admin?tab=promotions-management" replace />} />
-            <Route path="/admin/payment-records" element={<Navigate to="/admin?tab=payment-records" replace />} />
-            <Route path="/admin/user-logs" element={<Navigate to="/admin?tab=user-logs" replace />} />
-            <Route path="/admin/system-settings" element={<Navigate to="/admin?tab=system-settings" replace />} />
+
+            {/* Legacy redirect bridges */}
+            <Route path="/provider/*" element={<Navigate to="/admin" replace />} />
+            <Route path="/shop/*" element={<Navigate to="/cakes" replace />} />
+            <Route path="/cleaner/*" element={<Navigate to="/cakes" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
       </Router>
@@ -213,16 +207,14 @@ function AppContent() {
   );
 }
 
-function App() {
+export default function App() {
   return (
     <SettingsProvider>
       <AuthProvider>
-        <AppContent />
+        <CartProvider>
+          <AppContent />
+        </CartProvider>
       </AuthProvider>
     </SettingsProvider>
   );
 }
-
-export default App;
-
-

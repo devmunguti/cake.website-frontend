@@ -4,13 +4,18 @@ export const auditLogApi = {
   /**
    * Fetch paginated audit logs with search, status, category, action, and date filters.
    */
+  getLogs: async (params = {}) => {
+    const response = await api.get('/audit-logs', { params });
+    return response.data;
+  },
+
   getAuditLogs: async (params = {}) => {
     const response = await api.get('/audit-logs', { params });
     return response.data;
   },
 
   /**
-   * Fetch real-time audit metric counters (Events Today, Failed Logins, Critical Actions).
+   * Fetch real-time audit metric counters
    */
   getAuditMetrics: async () => {
     const response = await api.get('/audit-logs/metrics');
@@ -18,7 +23,7 @@ export const auditLogApi = {
   },
 
   /**
-   * Export filtered audit logs to CSV file.
+   * Export filtered audit logs to CSV file
    */
   exportAuditLogs: async (params = {}) => {
     const response = await api.get('/audit-logs/export', {
@@ -28,3 +33,5 @@ export const auditLogApi = {
     return response.data;
   }
 };
+
+export default auditLogApi;

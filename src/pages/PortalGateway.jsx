@@ -1,542 +1,245 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
-import { useSettings } from '../context/SettingsContext';
+import React, { useState } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { toast } from 'react-hot-toast';
 
 export default function PortalGateway() {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const { user, isAuthenticated, login, register } = useAuth();
-  const { settings } = useSettings();
-
-  const tabParam = searchParams.get('portal') || searchParams.get('tab') || searchParams.get('role');
-  const [activePortal, setActivePortal] = useState(tabParam === 'admin' ? 'admin' : 'provider');
-  const [providerMode, setProviderMode] = useState('login');
-
-  // If already logged in, automatically redirect directly to the appropriate dashboard
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      if (user.role === 'admin') {
-        navigate('/admin', { replace: true });
-      } else if (user.role === 'provider' || user.role === 'cleaner') {
-        navigate('/provider', { replace: true });
-      }
-    }
-  }, [isAuthenticated, user, navigate]);
-
-  // Form states
+  const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     fullName: '',
-    businessName: '',
     email: '',
     phone: '',
     password: '',
-    confirmPassword: '',
-    adminAccessKey: '',
+    confirmPassword: ''
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
+  const { login, register, isAuthenticated, user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const from = location.state?.from?.pathname || (user?.role === 'admin' ? '/admin' : '/');
+
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      if (user?.role === 'admin') {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate(from, { replace: true });
+      }
+    }
+  }, [isAuthenticated, user, navigate, from]);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    setErrorMsg('');
-    setSuccessMsg('');
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const validatePasswordRequirements = (pass) => {
-    if (pass.length < 8) return 'Password must be at least 8 characters long.';
-    if (!/[A-Z]/.test(pass)) return 'Password must contain at least 1 uppercase letter.';
-    if (!/[a-z]/.test(pass)) return 'Password must contain at least 1 lowercase letter.';
-    if (!/[0-9]/.test(pass)) return 'Password must contain at least 1 number.';
-    if (!/[^A-Za-z0-9]/.test(pass)) return 'Password must contain at least 1 special character.';
-    return null;
-  };
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-  const redirectByRole = (loggedInUser, requiresPasswordChange) => {
-    if (requiresPasswordChange) {
-      setSuccessMsg('Temporary password detected. Redirecting to password setup...');
-      setTimeout(() => navigate('/force-password-change'), 800);
+    if (!formData.email || !formData.password) {
+      toast.error('Email and password are required.');
       return;
     }
 
-    if (loggedInUser?.role === 'admin') {
-      setSuccessMsg('Super Admin verified! Redirecting to Admin Command Center...');
-      setTimeout(() => navigate('/admin'), 800);
-    } else if (loggedInUser?.role === 'provider' || loggedInUser?.role === 'cleaner') {
-      setSuccessMsg('Cleaner verified! Redirecting to Provider Portal...');
-      setTimeout(() => navigate('/provider'), 800);
-    } else {
-      setSuccessMsg('Welcome back! Redirecting...');
-      setTimeout(() => navigate('/'), 800);
+    if (!isLogin && formData.password !== formData.confirmPassword) {
+      toast.error('Passwords do not match.');
+      return;
     }
-  };
-
-  const handleProviderSubmit = async (e) => {
-    e.preventDefault();
-    setErrorMsg('');
-    setSuccessMsg('');
-    setLoading(true);
 
     try {
-      if (providerMode === 'register') {
-        if (formData.password !== formData.confirmPassword) {
-          setErrorMsg('Passwords do not match');
-          setLoading(false);
-          return;
-        }
-
-        const passErr = validatePasswordRequirements(formData.password);
-        if (passErr) {
-          setErrorMsg(passErr);
-          setLoading(false);
-          return;
-        }
-
-        // Register cleaner / provider
-        const payload = {
-          firstName: formData.firstName || formData.fullName.split(' ')[0] || 'Cleaner',
-          lastName: formData.lastName || formData.fullName.split(' ').slice(1).join(' ') || '',
-          name: formData.fullName || formData.businessName,
-          email: formData.email,
-          phone: formData.phone || '',
-          password: formData.password,
-          role: 'provider'
-        };
-
-        const res = await register(payload);
-
-        if (res && res.success) {
-          if (res.requiresApproval) {
-            setSuccessMsg(res.message || 'Registration submitted! Your account is pending administrator verification before you can access the dashboard.');
-            setProviderMode('login');
-            setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
+      setSubmitting(true);
+      if (isLogin) {
+        const res = await login({
+          email: formData.email.trim(),
+          password: formData.password
+        });
+        if (res.success) {
+          toast.success(`Welcome back, ${res.user?.firstName || res.user?.fullName || 'Customer'}!`);
+          if (res.user?.role === 'admin') {
+            navigate('/admin');
           } else {
-            setSuccessMsg('Cleaner account registered successfully! Redirecting...');
-            redirectByRole(res.user, res.requiresPasswordChange);
+            navigate(from);
           }
         }
       } else {
-        // Login cleaner / provider
-        const res = await login({
-          email: formData.email,
-          password: formData.password,
+        const res = await register({
+          firstName: formData.firstName.trim(),
+          lastName: formData.lastName.trim(),
+          fullName: `${formData.firstName} ${formData.lastName}`.trim(),
+          email: formData.email.trim(),
+          phone: formData.phone.trim(),
+          password: formData.password
         });
-
-        if (res && res.success) {
-          redirectByRole(res.user, res.requiresPasswordChange);
+        if (res.success) {
+          toast.success('Account created successfully!');
+          navigate('/');
         }
       }
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Authentication failed';
-      setErrorMsg(msg);
+      toast.error(err.response?.data?.message || 'Authentication failed. Please check your credentials.');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
-
-  const handleAdminSubmit = async (e) => {
-    e.preventDefault();
-    setErrorMsg('');
-    setSuccessMsg('');
-    setLoading(true);
-
-    try {
-      const res = await login({
-        email: formData.email,
-        password: formData.password,
-      });
-
-      if (res && res.success) {
-        redirectByRole(res.user, res.requiresPasswordChange);
-      }
-    } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Admin authentication failed';
-      setErrorMsg(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
 
   return (
-    <div className="bg-background font-body-md text-on-background min-h-screen flex items-center justify-center py-12 px-4">
-      <main className="flex flex-col w-full max-w-4xl items-center justify-center relative overflow-hidden bg-background">
-        {/* Ambient Background Glows */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary-fixed-dim/20 rounded-full blur-[100px] pointer-events-none"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-secondary-fixed-dim/10 rounded-full blur-[100px] pointer-events-none"></div>
-
-        <div className="w-full z-10">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-surface-container-high mb-4 shadow-[0_4px_20px_rgba(0,0,0,0.04)] cursor-pointer" onClick={() => navigate('/')}>
-              <span
-                className="material-symbols-outlined text-primary text-3xl"
-                style={{ fontVariationSettings: "'FILL' 1" }}
-              >
-                local_laundry_service
-              </span>
+    <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center py-16 px-4">
+      <div className="max-w-md w-full bg-white p-8 sm:p-10 rounded-3xl border border-[#E8DFD3] shadow-xl space-y-8 animate-fadeIn">
+        {/* Brand Logo & Header */}
+        <div className="text-center space-y-2">
+          <Link to="/" className="inline-flex items-center gap-2 mb-2">
+            <div className="w-12 h-12 rounded-2xl bg-[#C85A32] text-white flex items-center justify-center shadow-md">
+              <span className="material-symbols-outlined text-2xl">cake</span>
             </div>
-            <h1 className="font-headline-xl text-3xl font-bold text-on-background mb-2">
-              {settings?.platformName || 'Laundry'} Portal
-            </h1>
-
-            <p className="font-body-lg text-on-surface-variant max-w-lg mx-auto text-sm md:text-base">
-              Sign in or register your account to manage cleaning services or access administrative controls.
-            </p>
-          </div>
-
-          {/* Portal Switcher Tabs */}
-          <div className="flex justify-center mb-8">
-            <div className="bg-surface-container p-1 rounded-2xl flex border border-outline-variant/30 shadow-inner max-w-md w-full">
-              <button
-                type="button"
-                onClick={() => { setActivePortal('provider'); setErrorMsg(''); setSuccessMsg(''); }}
-                className={`flex-1 py-3 px-4 rounded-xl text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${activePortal === 'provider'
-                  ? 'bg-surface-container-lowest text-primary shadow-sm'
-                  : 'text-on-surface-variant hover:text-on-background'
-                  }`}
-              >
-                <span className="material-symbols-outlined text-lg">cleaning_services</span>
-                <span>Cleaners & Providers</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => { setActivePortal('admin'); setErrorMsg(''); setSuccessMsg(''); }}
-                className={`flex-1 py-3 px-4 rounded-xl text-sm font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${activePortal === 'admin'
-                  ? 'bg-surface-container-lowest text-primary shadow-sm'
-                  : 'text-on-surface-variant hover:text-on-background'
-                  }`}
-              >
-                <span className="material-symbols-outlined text-lg">admin_panel_settings</span>
-                <span>Platform Admin</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Feedback Messages */}
-          {errorMsg && (
-            <div className="max-w-md mx-auto mb-6 p-4 bg-error-container text-on-error-container text-sm rounded-xl flex items-center gap-3 border border-error/20">
-              <span className="material-symbols-outlined text-error">error</span>
-              <span>{errorMsg}</span>
-            </div>
-          )}
-          {successMsg && (
-            <div className="max-w-md mx-auto mb-6 p-4 bg-primary/10 text-primary text-sm rounded-xl flex items-center gap-3 border border-primary/20">
-              <span className="material-symbols-outlined text-primary">check_circle</span>
-              <span>{successMsg}</span>
-            </div>
-          )}
-
-          {/* Dynamic Card Container */}
-          <div className="max-w-md mx-auto bg-surface-container-lowest rounded-[24px] p-8 shadow-[0_8px_32px_rgba(0,0,0,0.06)] border border-outline-variant/20 relative overflow-hidden transition-all">
-            <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${activePortal === 'provider' ? 'from-secondary-fixed-dim via-primary to-secondary' : 'from-primary via-tertiary to-primary'} transition-all`}></div>
-
-            {/* Provider Section */}
-            {activePortal === 'provider' && (
-              <div>
-                <div className="flex items-center justify-between mb-6 pb-4 border-b border-outline-variant/20">
-                  <div>
-                    <h2 className="text-xl font-bold text-on-background">Cleaner Access</h2>
-                    <p className="text-xs text-on-surface-variant mt-0.5">Facility & Service Partner Portal</p>
-                  </div>
-                  {/* Mode switcher (Login / Register) */}
-                  <div className="flex bg-surface-container rounded-lg p-0.5 border border-outline-variant/30">
-                    <button
-                      type="button"
-                      onClick={() => { setProviderMode('login'); setErrorMsg(''); }}
-                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${providerMode === 'login'
-                        ? 'bg-surface-container-lowest text-primary shadow-xs'
-                        : 'text-on-surface-variant hover:text-on-background'
-                        }`}
-                    >
-                      Login
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setProviderMode('register'); setErrorMsg(''); }}
-                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${providerMode === 'register'
-                        ? 'bg-surface-container-lowest text-primary shadow-xs'
-                        : 'text-on-surface-variant hover:text-on-background'
-                        }`}
-                    >
-                      Register
-                    </button>
-                  </div>
-                </div>
-
-                <form onSubmit={handleProviderSubmit} className="space-y-4">
-                  {providerMode === 'register' && (
-                    <>
-                      <div>
-                        <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">
-                          Full Name / Contact Person
-                        </label>
-                        <div className="relative">
-                          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60 text-lg">person</span>
-                          <input
-                            type="text"
-                            name="fullName"
-                            required
-                            value={formData.fullName}
-                            onChange={handleChange}
-                            placeholder="e.g. Jane Doe"
-                            className="w-full pl-10 pr-4 py-2.5 bg-surface-container/50 border border-outline-variant/40 rounded-xl text-sm focus:outline-none focus:border-primary focus:bg-surface-container-lowest transition-all"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">
-                          Facility / Business Name
-                        </label>
-                        <div className="relative">
-                          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60 text-lg">storefront</span>
-                          <input
-                            type="text"
-                            name="businessName"
-                            required
-                            value={formData.businessName}
-                            onChange={handleChange}
-                            placeholder="e.g. Sparkle Clean Laundry Hub"
-                            className="w-full pl-10 pr-4 py-2.5 bg-surface-container/50 border border-outline-variant/40 rounded-xl text-sm focus:outline-none focus:border-primary focus:bg-surface-container-lowest transition-all"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">
-                          Phone Number
-                        </label>
-                        <div className="relative">
-                          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60 text-lg">call</span>
-                          <input
-                            type="tel"
-                            name="phone"
-                            required
-                            value={formData.phone}
-                            onChange={handleChange}
-                            placeholder="+254 700 000 000"
-                            className="w-full pl-10 pr-4 py-2.5 bg-surface-container/50 border border-outline-variant/40 rounded-xl text-sm focus:outline-none focus:border-primary focus:bg-surface-container-lowest transition-all"
-                          />
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  <div>
-                    <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">
-                      Email Address
-                    </label>
-                    <div className="relative">
-                      <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60 text-lg">mail</span>
-                      <input
-                        type="email"
-                        name="email"
-                        required
-                        value={formData.email}
-                        onChange={handleChange}
-                        placeholder="cleaner@laundry.com"
-                        className="w-full pl-10 pr-4 py-2.5 bg-surface-container/50 border border-outline-variant/40 rounded-xl text-sm focus:outline-none focus:border-primary focus:bg-surface-container-lowest transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">
-                      Password
-                    </label>
-                    <div className="relative">
-                      <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60 text-lg">lock</span>
-                      <input
-                        type="password"
-                        name="password"
-                        required
-                        value={formData.password}
-                        onChange={handleChange}
-                        placeholder="••••••••"
-                        className="w-full pl-10 pr-4 py-2.5 bg-surface-container/50 border border-outline-variant/40 rounded-xl text-sm focus:outline-none focus:border-primary focus:bg-surface-container-lowest transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  {providerMode === 'register' && (
-                    <div>
-                      <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">
-                        Confirm Password
-                      </label>
-                      <div className="relative">
-                        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60 text-lg">lock_reset</span>
-                        <input
-                          type="password"
-                          name="confirmPassword"
-                          required
-                          value={formData.confirmPassword}
-                          onChange={handleChange}
-                          placeholder="••••••••"
-                          className="w-full pl-10 pr-4 py-2.5 bg-surface-container/50 border border-outline-variant/40 rounded-xl text-sm focus:outline-none focus:border-primary focus:bg-surface-container-lowest transition-all"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full mt-2 py-3 px-4 bg-primary hover:bg-primary-fixed-dim text-on-primary font-semibold text-sm rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    {loading ? (
-                      <span className="material-symbols-outlined animate-spin text-base">sync</span>
-                    ) : (
-                      <>
-                        <span>{providerMode === 'register' ? 'Register Cleaner Account' : 'Sign In as Cleaner'}</span>
-                        <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                      </>
-                    )}
-                  </button>
-                </form>
-
-                <div className="mt-6 pt-4 border-t border-outline-variant/20 text-center">
-                  <p className="text-xs text-on-surface-variant">
-                    {providerMode === 'login' ? (
-                      <>
-                        New service provider?{' '}
-                        <button
-                          type="button"
-                          onClick={() => setProviderMode('register')}
-                          className="text-primary font-semibold hover:underline"
-                        >
-                          Register your facility here
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        Already registered?{' '}
-                        <button
-                          type="button"
-                          onClick={() => setProviderMode('login')}
-                          className="text-primary font-semibold hover:underline"
-                        >
-                          Sign in to your account
-                        </button>
-                      </>
-                    )}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Admin Section */}
-            {activePortal === 'admin' && (
-              <div>
-                <div className="mb-6 pb-4 border-b border-outline-variant/20">
-                  <h2 className="text-xl font-bold text-on-background">Admin Portal Login</h2>
-                  <p className="text-xs text-on-surface-variant mt-0.5">Central Command System & Analytics</p>
-                </div>
-
-                <form onSubmit={handleAdminSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">
-                      Admin Email Address
-                    </label>
-                    <div className="relative">
-                      <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60 text-lg">badge</span>
-                      <input
-                        type="email"
-                        name="email"
-                        required
-                        value={formData.email}
-                        onChange={handleChange}
-                        placeholder="admin@aura.com"
-                        className="w-full pl-10 pr-4 py-2.5 bg-surface-container/50 border border-outline-variant/40 rounded-xl text-sm focus:outline-none focus:border-primary focus:bg-surface-container-lowest transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">
-                      Master Password
-                    </label>
-                    <div className="relative">
-                      <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60 text-lg">shield</span>
-                      <input
-                        type="password"
-                        name="password"
-                        required
-                        value={formData.password}
-                        onChange={handleChange}
-                        placeholder="••••••••"
-                        className="w-full pl-10 pr-4 py-2.5 bg-surface-container/50 border border-outline-variant/40 rounded-xl text-sm focus:outline-none focus:border-primary focus:bg-surface-container-lowest transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-1.5">
-                      Security Verification Key (Optional)
-                    </label>
-                    <div className="relative">
-                      <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60 text-lg">key</span>
-                      <input
-                        type="password"
-                        name="adminAccessKey"
-                        value={formData.adminAccessKey}
-                        onChange={handleChange}
-                        placeholder="Key or Auth token"
-                        className="w-full pl-10 pr-4 py-2.5 bg-surface-container/50 border border-outline-variant/40 rounded-xl text-sm focus:outline-none focus:border-primary focus:bg-surface-container-lowest transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full mt-2 py-3 px-4 bg-on-background hover:bg-black text-white font-semibold text-sm rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    {loading ? (
-                      <span className="material-symbols-outlined animate-spin text-base">sync</span>
-                    ) : (
-                      <>
-                        <span>Access Command Center</span>
-                        <span className="material-symbols-outlined text-sm">login</span>
-                      </>
-                    )}
-                  </button>
-                </form>
-
-                <div className="mt-6 pt-4 border-t border-outline-variant/20 text-center">
-                  <p className="text-xs text-on-surface-variant">
-                    Restricted access. All administrative access attempts are logged and monitored.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Footer Links */}
-          <div className="mt-8 text-center">
-            <a
-              className="font-body-sm text-xs text-on-surface-variant hover:text-primary transition-colors mx-3"
-              href="#privacy"
-              onClick={(e) => e.preventDefault()}
-            >
-              Privacy Policy
-            </a>
-            <span className="text-outline-variant">•</span>
-            <a
-              className="font-body-sm text-xs text-on-surface-variant hover:text-primary transition-colors mx-3"
-              href="#status"
-              onClick={(e) => e.preventDefault()}
-            >
-              System Telemetry Status
-            </a>
-          </div>
+          </Link>
+          <h1 className="font-serif-display text-2xl sm:text-3xl font-bold text-[#2C2420]">
+            {isLogin ? 'Sign In to Your Account' : 'Create Customer Account'}
+          </h1>
+          <p className="text-xs text-stone-500">
+            {isLogin
+              ? 'Access your cake orders, saved addresses, and quotes.'
+              : 'Join Sweet Delights for faster cake checkout and exclusive offers.'}
+          </p>
         </div>
-      </main>
+
+        {/* Tab Switcher */}
+        <div className="flex bg-[#FAF7F2] p-1 rounded-2xl border border-[#E8DFD3]">
+          <button
+            type="button"
+            onClick={() => setIsLogin(true)}
+            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              isLogin ? 'bg-white text-[#C85A32] shadow-sm' : 'text-stone-600 hover:text-[#2C2420]'
+            }`}
+          >
+            Sign In
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsLogin(false)}
+            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              !isLogin ? 'bg-white text-[#C85A32] shadow-sm' : 'text-stone-600 hover:text-[#2C2420]'
+            }`}
+          >
+            Create Account
+          </button>
+        </div>
+
+        {/* Auth Form */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {!isLogin && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-bold text-stone-700 block mb-1">First Name</label>
+                <input
+                  type="text"
+                  name="firstName"
+                  value={formData.firstName}
+                  onChange={handleChange}
+                  required
+                  placeholder="Sarah"
+                  className="w-full p-3 rounded-xl border border-[#E8DFD3] text-sm bg-[#FAF7F2] focus:border-[#C85A32] focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-stone-700 block mb-1">Last Name</label>
+                <input
+                  type="text"
+                  name="lastName"
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  placeholder="Mwangi"
+                  className="w-full p-3 rounded-xl border border-[#E8DFD3] text-sm bg-[#FAF7F2] focus:border-[#C85A32] focus:outline-none"
+                />
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="text-xs font-bold text-stone-700 block mb-1">Email Address</label>
+            <input
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              required
+              placeholder="customer@example.com"
+              className="w-full p-3 rounded-xl border border-[#E8DFD3] text-sm bg-[#FAF7F2] focus:border-[#C85A32] focus:outline-none"
+            />
+          </div>
+
+          {!isLogin && (
+            <div>
+              <label className="text-xs font-bold text-stone-700 block mb-1">Phone Number (M-Pesa)</label>
+              <input
+                type="tel"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                placeholder="0712 345 678"
+                className="w-full p-3 rounded-xl border border-[#E8DFD3] text-sm bg-[#FAF7F2] focus:border-[#C85A32] focus:outline-none"
+              />
+            </div>
+          )}
+
+          <div>
+            <label className="text-xs font-bold text-stone-700 block mb-1">Password</label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                required
+                placeholder="••••••••"
+                className="w-full p-3 pr-10 rounded-xl border border-[#E8DFD3] text-sm bg-[#FAF7F2] focus:border-[#C85A32] focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
+              >
+                <span className="material-symbols-outlined text-lg">
+                  {showPassword ? 'visibility_off' : 'visibility'}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {!isLogin && (
+            <div>
+              <label className="text-xs font-bold text-stone-700 block mb-1">Confirm Password</label>
+              <input
+                type="password"
+                name="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                required
+                placeholder="••••••••"
+                className="w-full p-3 rounded-xl border border-[#E8DFD3] text-sm bg-[#FAF7F2] focus:border-[#C85A32] focus:outline-none"
+              />
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full py-3.5 rounded-full bg-[#C85A32] text-white font-bold text-sm hover:bg-[#B04B25] shadow-md transition-all cursor-pointer disabled:opacity-50 mt-2"
+          >
+            {submitting ? 'Please wait...' : isLogin ? 'Sign In' : 'Create Account'}
+          </button>
+        </form>
+
+        <div className="text-center text-xs text-stone-500 pt-2 border-t border-stone-100">
+          <Link to="/" className="text-[#C85A32] font-semibold hover:underline">
+            ← Back to Bakery Home
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }
-

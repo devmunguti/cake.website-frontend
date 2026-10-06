@@ -1,567 +1,250 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { reviewApi } from '../api/reviewApi';
-import Navbar from '../components/layout/Navbar';
-import { SkeletonCard } from '../components/ui/Skeleton';
-import EmptyState from '../components/ui/EmptyState';
+import { toast } from 'react-hot-toast';
 
 export default function ReviewsPage() {
-  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const prefillOrderRef = searchParams.get('orderRef') || '';
+
+  const [reviews, setReviews] = useState([]);
+  const [stats, setStats] = useState({ averageRating: 5.0, totalReviews: 0 });
   const [loading, setLoading] = useState(true);
-  const [providers, setProviders] = useState([]);
-  const [error, setError] = useState(null);
 
-  // Filter & Sort States
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [selectedMinRating, setSelectedMinRating] = useState('All');
-  const [selectedSort, setSelectedSort] = useState('rating_desc');
-  const [selectedPriceFilter, setSelectedPriceFilter] = useState('All');
-  const [expandedServices, setExpandedServices] = useState({});
+  // Review submission state
+  const [showSubmitModal, setShowSubmitModal] = useState(!!prefillOrderRef);
+  const [orderRef, setOrderRef] = useState(prefillOrderRef);
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState('');
+  const [occasion, setOccasion] = useState('Birthday Party');
+  const [submitting, setSubmitting] = useState(false);
 
-  // Quick Review Modal State
-  const [reviewOrderRef, setReviewOrderRef] = useState('');
-
-  const fetchDirectory = useCallback(async () => {
+  const fetchReviews = async () => {
     try {
       setLoading(true);
-      setError(null);
-
-      const params = {
-        category: selectedCategory !== 'All' ? selectedCategory : undefined,
-        minRating: selectedMinRating !== 'All' ? selectedMinRating : undefined,
-        sort: selectedSort,
-        priceMax: selectedPriceFilter === 'budget' ? 300 : selectedPriceFilter === 'standard' ? 800 : undefined,
-        priceMin: selectedPriceFilter === 'standard' ? 300 : selectedPriceFilter === 'premium' ? 800 : undefined,
-        search: searchQuery || undefined
-      };
-
-      const res = await reviewApi.getProviderDirectory(params);
-      if (res.success && res.data) {
-        setProviders(res.data);
-      } else {
-        setError(res.message || 'Failed to load cleaner reviews.');
+      const res = await reviewApi.getReviews({ limit: 50 });
+      if (res.success) {
+        setReviews(res.data || []);
+        if (res.stats) setStats(res.stats);
       }
     } catch (err) {
-      console.error('Error fetching provider directory:', err);
-      setError(err.response?.data?.message || 'Error loading cleaner rankings and reviews.');
+      console.error('Error fetching reviews:', err);
     } finally {
       setLoading(false);
     }
-  }, [selectedCategory, selectedMinRating, selectedSort, selectedPriceFilter, searchQuery]);
+  };
 
   useEffect(() => {
-    fetchDirectory();
-  }, [fetchDirectory]);
+    fetchReviews();
+  }, []);
 
-  const toggleServicesExpand = (providerId) => {
-    setExpandedServices(prev => ({
-      ...prev,
-      [providerId]: !prev[providerId]
-    }));
-  };
-
-  const handleResetFilters = () => {
-    setSearchQuery('');
-    setSelectedCategory('All');
-    setSelectedMinRating('All');
-    setSelectedSort('rating_desc');
-    setSelectedPriceFilter('All');
-  };
-
-  const handleBookService = (provider, service) => {
-    navigate('/checkout', {
-      state: {
-        serviceId: service._id,
-        serviceName: service.name,
-        details: service.description || `${service.pricingType === 'per_kg' ? 'Per KG wash' : 'Flat rate clean'} by ${provider.name}`,
-        servicePrice: service.basePrice || 150,
-        deliveryOption: service.deliveryFee === 0 ? 'Free Delivery' : 'Standard Pickup & Delivery',
-        deliveryPrice: typeof service.deliveryFee === 'number' ? service.deliveryFee : 150,
-        tillNumber: provider.tillNumber || '8995354',
-        providerName: provider.name,
-        hasChannelConfigured: true
-      }
-    });
-  };
-
-  const handleTrackReviewSubmit = (e) => {
+  const handleSubmitReview = async (e) => {
     e.preventDefault();
-    if (reviewOrderRef.trim()) {
-      navigate(`/track-order/${reviewOrderRef.trim().toUpperCase()}`);
+    if (!orderRef.trim()) {
+      toast.error('Please enter your Order Reference (e.g. ORD-0001).');
+      return;
+    }
+    if (!comment.trim()) {
+      toast.error('Please write a brief comment.');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const res = await reviewApi.submitReview({
+        orderRef: orderRef.trim().toUpperCase(),
+        rating: Number(rating),
+        comment: comment.trim(),
+        occasion
+      });
+
+      if (res.success) {
+        toast.success('Thank you! Your review has been published.');
+        setShowSubmitModal(false);
+        setComment('');
+        fetchReviews();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Error submitting review. Please verify your order number.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const categories = ['All', 'Wash & Fold', 'Dry Cleaning', 'Bedding & Linens', 'Ironing & Pressing', 'Duvet Care'];
-
-  const sortOptions = [
-    { id: 'rating_desc', label: '⭐ Highest Rated (5★ First)', icon: 'star' },
-    { id: 'cheap', label: '🏷️ Cheapest First (Low Price)', icon: 'payments' },
-    { id: 'reviews_desc', label: '💬 Most Reviewed', icon: 'forum' },
-    { id: 'price_desc', label: '💎 Premium / High Price', icon: 'diamond' }
-  ];
-
-  const priceFilterOptions = [
-    { id: 'All', label: 'All Prices' },
-    { id: 'budget', label: 'Under KES 300 (Budget / Cheap)' },
-    { id: 'standard', label: 'KES 300 - KES 800 (Standard)' },
-    { id: 'premium', label: 'KES 800+ (Premium)' }
-  ];
-
-  const hasActiveFilters = searchQuery || selectedCategory !== 'All' || selectedMinRating !== 'All' || selectedSort !== 'rating_desc' || selectedPriceFilter !== 'All';
-
   return (
-    <div className="bg-[#f9f9fc] min-h-screen text-[#1a1c1e] font-['Inter'] flex flex-col">
-      <Navbar />
+    <div className="min-h-screen bg-[#FAF7F2] py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+        {/* Header & Stats Banner */}
+        <div className="bg-white p-8 sm:p-12 rounded-3xl border border-[#E8DFD3] shadow-sm flex flex-col md:flex-row items-center justify-between gap-8">
+          <div className="space-y-2 text-center md:text-left">
+            <span className="text-xs uppercase font-bold tracking-widest text-[#C85A32]">Celebration Feedback</span>
+            <h1 className="font-serif-display text-3xl sm:text-4xl font-bold text-[#2C2420]">
+              Customer Reviews & Experiences
+            </h1>
+            <p className="text-sm text-stone-600">
+              Read authentic feedback from birthday hosts, brides, event planners, and cake lovers.
+            </p>
+          </div>
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-        {/* Hero Section */}
-        <div className="relative rounded-3xl bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white p-8 md:p-12 shadow-xl overflow-hidden">
-          <div className="absolute right-0 top-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-
-          <div className="relative z-10 max-w-3xl space-y-4">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md text-amber-300 text-xs font-bold uppercase tracking-wider">
-              <span className="material-symbols-outlined text-[16px]">verified</span>
-              <span>Real Verified Client Ratings &amp; Pricing</span>
+          <div className="flex flex-col sm:flex-row items-center gap-6">
+            <div className="text-center p-4 bg-[#FAF7F2] rounded-2xl border border-[#E8DFD3]">
+              <div className="font-serif-display font-extrabold text-4xl text-[#C85A32]">
+                {stats.averageRating ? stats.averageRating.toFixed(1) : '5.0'}
+              </div>
+              <div className="flex text-amber-400 text-sm justify-center my-1">
+                {'★'.repeat(5)}
+              </div>
+              <p className="text-xs font-bold text-stone-500">Based on {stats.totalReviews || reviews.length} reviews</p>
             </div>
 
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black font-['Geist'] tracking-tight text-white leading-tight">
-              Cleaner Rankings &amp; Client Reviews
-            </h1>
+            <button
+              onClick={() => setShowSubmitModal(true)}
+              className="px-8 py-3.5 rounded-full bg-[#C85A32] text-white font-bold text-sm hover:bg-[#B04B25] shadow-lg shadow-orange-900/15 cursor-pointer flex items-center gap-2"
+            >
+              <span className="material-symbols-outlined text-lg">rate_review</span>
+              <span>Write a Review</span>
+            </button>
+          </div>
+        </div>
 
-            <p className="text-blue-100/90 text-sm sm:text-base leading-relaxed max-w-2xl">
-              Discover top-rated laundry partners arranged by transparent 5-star ratings or filter by who is cheapest and most affordable in your area.
-            </p>
+        {/* Reviews Grid */}
+        {loading ? (
+          <div className="py-20 text-center">
+            <div className="w-12 h-12 border-4 border-[#C85A32] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="font-serif-display font-semibold text-stone-600">Loading reviews...</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {reviews.map((rev) => (
+              <div key={rev._id} className="p-6 rounded-3xl bg-white border border-[#E8DFD3] shadow-sm space-y-4 flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-sm text-[#2C2420]">{rev.customerName}</h4>
+                      <p className="text-[11px] text-[#C85A32] font-semibold">{rev.occasion || 'Celebration'}</p>
+                    </div>
+                    <div className="flex text-amber-400 text-sm">
+                      {'★'.repeat(rev.rating)}
+                    </div>
+                  </div>
 
-            {/* Quick Order Review Input */}
-            <div className="pt-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 max-w-xl">
-              <form onSubmit={handleTrackReviewSubmit} className="flex-1 flex items-center bg-white/15 backdrop-blur-md rounded-2xl p-1.5 border border-white/20 focus-within:bg-white/25 transition-all">
-                <span className="material-symbols-outlined text-white/60 ml-3 mr-2 text-[20px]">rate_review</span>
-                <input
-                  type="text"
-                  placeholder="Enter Order # to leave a review..."
-                  value={reviewOrderRef}
-                  onChange={(e) => setReviewOrderRef(e.target.value)}
-                  className="bg-transparent border-none outline-none text-white text-sm w-full placeholder:text-white/50"
-                />
+                  <p className="text-xs text-stone-700 leading-relaxed italic">
+                    "{rev.comment}"
+                  </p>
+
+                  {rev.cakeName && (
+                    <div className="inline-block px-3 py-1 rounded-full bg-[#FAF7F2] border border-[#E8DFD3] text-[11px] font-semibold text-stone-600">
+                      🎂 {rev.cakeName}
+                    </div>
+                  )}
+                </div>
+
+                {/* Admin Reply */}
+                {rev.adminReply?.text && (
+                  <div className="p-3.5 rounded-2xl bg-[#FAECE5] border border-[#E8DFD3] text-xs text-stone-800 space-y-1">
+                    <div className="flex items-center gap-1.5 font-bold text-[#C85A32]">
+                      <span className="material-symbols-outlined text-sm">restaurant</span>
+                      <span>Bakery Chef:</span>
+                    </div>
+                    <p className="italic text-[11px] text-stone-700">{rev.adminReply.text}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Submit Review Modal */}
+        {showSubmitModal && (
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+            <div className="bg-white rounded-3xl max-w-lg w-full p-8 border border-[#E8DFD3] shadow-2xl space-y-6 relative">
+              <button
+                onClick={() => setShowSubmitModal(false)}
+                className="absolute top-6 right-6 text-stone-400 hover:text-stone-700"
+              >
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
+
+              <div className="space-y-1 text-center">
+                <span className="text-xs uppercase font-bold tracking-widest text-[#C85A32]">Verified Orders Only</span>
+                <h3 className="font-serif-display text-2xl font-bold text-[#2C2420]">Review Your Cake</h3>
+                <p className="text-xs text-stone-500">Share your culinary experience with our baking team.</p>
+              </div>
+
+              <form onSubmit={handleSubmitReview} className="space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-stone-700 block mb-1">Order Reference *</label>
+                  <input
+                    type="text"
+                    value={orderRef}
+                    onChange={(e) => setOrderRef(e.target.value.toUpperCase())}
+                    required
+                    placeholder="e.g. ORD-0001"
+                    className="w-full p-3 rounded-xl border border-[#E8DFD3] text-sm uppercase font-bold bg-[#FAF7F2] focus:border-[#C85A32] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-stone-700 block mb-1">Star Rating</label>
+                  <div className="flex gap-2">
+                    {[5, 4, 3, 2, 1].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setRating(star)}
+                        className={`flex-1 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                          rating === star
+                            ? 'border-[#C85A32] bg-[#FAECE5] text-[#C85A32]'
+                            : 'border-[#E8DFD3] text-stone-600 hover:bg-[#FAF7F2]'
+                        }`}
+                      >
+                        {star} ★
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-stone-700 block mb-1">Celebration Occasion</label>
+                  <select
+                    value={occasion}
+                    onChange={(e) => setOccasion(e.target.value)}
+                    className="w-full p-3 rounded-xl border border-[#E8DFD3] text-sm bg-[#FAF7F2] focus:border-[#C85A32] focus:outline-none"
+                  >
+                    <option value="Birthday Party">Birthday Party</option>
+                    <option value="Wedding Reception">Wedding Reception</option>
+                    <option value="Anniversary">Anniversary</option>
+                    <option value="Baby Shower">Baby Shower</option>
+                    <option value="Graduation">Graduation</option>
+                    <option value="Corporate Event">Corporate Event</option>
+                    <option value="Personal Treat">Personal Treat</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-stone-700 block mb-1">Your Review Comment *</label>
+                  <textarea
+                    rows={4}
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    required
+                    placeholder="How was the sponge texture, flavor balance, decoration, and delivery experience?..."
+                    className="w-full p-3 rounded-xl border border-[#E8DFD3] text-xs bg-[#FAF7F2] focus:border-[#C85A32] focus:outline-none"
+                  />
+                </div>
+
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-white text-blue-950 hover:bg-blue-50 rounded-xl text-xs font-bold shadow-sm transition-colors cursor-pointer shrink-0"
+                  disabled={submitting}
+                  className="w-full py-3.5 rounded-full bg-[#C85A32] text-white font-bold text-sm hover:bg-[#B04B25] shadow-md transition-all cursor-pointer disabled:opacity-50"
                 >
-                  Rate Order
+                  {submitting ? 'Publishing Review...' : 'Publish Review'}
                 </button>
               </form>
             </div>
           </div>
-        </div>
-
-        {/* Search & Comprehensive Filter Controls */}
-        <div className="bg-white rounded-3xl p-6 md:p-8 shadow-xs border border-[#c3c5d9]/30 space-y-6">
-          {/* Top Row: Search & Dropdowns */}
-          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
-            {/* Search Input */}
-            <div className="relative flex-1 max-w-lg">
-              <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">
-                search
-              </span>
-              <input
-                type="text"
-                placeholder="Search cleaner name, location, service, or pricing..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-50 py-3 pl-10 pr-4 rounded-2xl text-sm border border-slate-200 outline-none focus:border-blue-600 focus:bg-white transition-all"
-              />
-            </div>
-
-            {/* Quick Sorting Dropdown & Rating Filter */}
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-slate-500 shrink-0">Sort By:</span>
-                <select
-                  value={selectedSort}
-                  onChange={(e) => setSelectedSort(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 text-slate-800 text-xs font-bold py-2.5 px-3 rounded-xl outline-none focus:border-blue-600 cursor-pointer"
-                >
-                  <option value="rating_desc">⭐ 5★ Top Rated First</option>
-                  <option value="cheap">🏷️ Cheapest / Low Price First</option>
-                  <option value="reviews_desc">💬 Most Reviewed</option>
-                  <option value="price_desc">💎 Premium / High Price</option>
-                </select>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-slate-500 shrink-0">Min Rating:</span>
-                <select
-                  value={selectedMinRating}
-                  onChange={(e) => setSelectedMinRating(e.target.value)}
-                  className="bg-slate-50 border border-slate-200 text-slate-800 text-xs font-bold py-2.5 px-3 rounded-xl outline-none focus:border-blue-600 cursor-pointer"
-                >
-                  <option value="All">All Ratings</option>
-                  <option value="5.0">5.0 Stars (Perfect)</option>
-                  <option value="4.8">4.8+ Stars</option>
-                  <option value="4.5">4.5+ Stars</option>
-                  <option value="4.0">4.0+ Stars</option>
-                </select>
-              </div>
-
-              {hasActiveFilters && (
-                <button
-                  type="button"
-                  onClick={handleResetFilters}
-                  className="text-xs font-bold text-rose-600 hover:text-rose-700 px-3 py-2 bg-rose-50 hover:bg-rose-100 rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[14px]">clear_all</span>
-                  <span>Reset</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Quick Sort / Filter Buttons */}
-          <div className="space-y-3 pt-2 border-t border-slate-100">
-            {/* Price Filter Pill Buttons */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1">
-                <span className="material-symbols-outlined text-[14px]">payments</span>
-                <span>Price:</span>
-              </span>
-              {priceFilterOptions.map((opt) => (
-                <button
-                  key={opt.id}
-                  onClick={() => setSelectedPriceFilter(opt.id)}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${selectedPriceFilter === opt.id
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
-                    }`}
-                >
-                  {opt.id === 'budget' && <span className="material-symbols-outlined text-[14px]">savings</span>}
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Category Filter Pills */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1">
-                <span className="material-symbols-outlined text-[14px]">category</span>
-                <span>Category:</span>
-              </span>
-              {categories.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${selectedCategory === cat
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
-                    }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Directory & Rankings Stream */}
-        {loading ? (
-          <div className="space-y-6">
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
-          </div>
-        ) : error ? (
-          <div className="p-6 bg-rose-50 border border-rose-200 rounded-3xl text-rose-700 text-center space-y-2">
-            <span className="material-symbols-outlined text-3xl">error</span>
-            <p className="text-sm font-semibold">{error}</p>
-          </div>
-        ) : providers.length === 0 ? (
-          <EmptyState
-            icon="rate_review"
-            title="No Verified Cleaners Found"
-            description="No cleaners match your current category, price, or minimum rating filter."
-            actionLabel="Reset All Filters"
-            actionIcon="refresh"
-            onAction={handleResetFilters}
-          />
-        ) : (
-          <div className="space-y-8">
-            {providers.map((provider) => {
-              const isExpanded = expandedServices[provider.id];
-              const rankColor =
-                provider.rank === 1
-                  ? 'bg-amber-100 text-amber-900 border-amber-300'
-                  : provider.rank === 2
-                    ? 'bg-slate-200 text-slate-800 border-slate-300'
-                    : provider.rank === 3
-                      ? 'bg-amber-50 text-amber-800 border-amber-200'
-                      : 'bg-blue-50 text-blue-700 border-blue-200';
-
-              return (
-                <div
-                  key={provider.id}
-                  className={`bg-white rounded-3xl border transition-all duration-300 shadow-xs hover:shadow-md overflow-hidden ${provider.isPromoted ? 'border-indigo-300 ring-2 ring-indigo-500/10' : 'border-[#c3c5d9]/30'
-                    }`}
-                >
-                  {/* Card Header & Cleaner Summary */}
-                  <div className="p-6 md:p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-slate-100">
-                    <div className="flex items-start gap-4">
-                      {/* Rank Badge */}
-                      <div
-                        className={`w-12 h-12 rounded-2xl flex flex-col items-center justify-center font-black font-['Geist'] text-sm shrink-0 border ${rankColor}`}
-                      >
-                        <span className="text-[10px] font-bold uppercase leading-none">Rank</span>
-                        <span>#{provider.rank}</span>
-                      </div>
-
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h2 className="text-xl sm:text-2xl font-black font-['Geist'] text-slate-900">
-                            {provider.name}
-                          </h2>
-
-                          {provider.isPromoted && (
-                            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200 flex items-center gap-1">
-                              <span className="material-symbols-outlined text-[14px]">star</span>
-                              <span>Top Partner</span>
-                            </span>
-                          )}
-
-                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[14px]">verified</span>
-                            <span>Verified</span>
-                          </span>
-                        </div>
-
-                        {provider.promotionTagline && (
-                          <p className="text-xs font-medium text-indigo-600 italic">
-                            "{provider.promotionTagline}"
-                          </p>
-                        )}
-
-                        <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap pt-0.5">
-                          <span className="flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[16px] text-slate-400">location_on</span>
-                            <span>{provider.location}</span>
-                          </span>
-                          <span>•</span>
-                          <span className="flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[16px] text-slate-400">local_laundry_service</span>
-                            <span>{provider.totalServicesCount} Services</span>
-                          </span>
-                          {provider.minPrice > 0 && (
-                            <>
-                              <span>•</span>
-                              <span className="inline-flex items-center gap-1 font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
-                                <span className="material-symbols-outlined text-[14px]">payments</span>
-                                <span>{provider.startingPriceFormatted}</span>
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Overall Rating Box & Direct CTA */}
-                    <div className="flex items-center gap-4 shrink-0 bg-slate-50/80 p-4 rounded-2xl border border-slate-200/60">
-                      <div className="text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <div className="flex text-amber-400">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <span
-                                key={star}
-                                className="material-symbols-outlined text-[18px]"
-                                style={{
-                                  fontVariationSettings: star <= Math.round(provider.rating) ? "'FILL' 1" : "'FILL' 0"
-                                }}
-                              >
-                                star
-                              </span>
-                            ))}
-                          </div>
-                          <span className="font-black text-slate-900 text-lg font-['Geist']">
-                            {Number(provider.rating).toFixed(1)}
-                          </span>
-                        </div>
-                        <span className="text-xs text-slate-500 font-medium">
-                          Based on {provider.reviewsCount} verified reviews
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Provider Services Showcase */}
-                  <div className="p-6 md:p-8 bg-slate-50/50 border-b border-slate-100 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-blue-600 text-[20px]">local_laundry_service</span>
-                        <h3 className="font-bold text-slate-900 text-sm sm:text-base font-['Geist']">
-                          Services Offered by {provider.name}
-                        </h3>
-                      </div>
-
-                      {provider.services?.length > 3 && (
-                        <button
-                          type="button"
-                          onClick={() => toggleServicesExpand(provider.id)}
-                          className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
-                        >
-                          <span>{isExpanded ? 'Show Less' : `View All ${provider.services.length} Services`}</span>
-                          <span className="material-symbols-outlined text-[16px]">
-                            {isExpanded ? 'expand_less' : 'expand_more'}
-                          </span>
-                        </button>
-                      )}
-                    </div>
-
-                    {provider.services?.length === 0 ? (
-                      <div className="text-xs text-slate-400 py-2">
-                        No active service offerings published currently.
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {(isExpanded ? provider.services : provider.services.slice(0, 3)).map((service) => (
-                          <div
-                            key={service._id}
-                            className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col justify-between hover:border-blue-300 transition-colors"
-                          >
-                            <div className="space-y-1.5 mb-3">
-                              <div className="flex items-start justify-between gap-2">
-                                <h4 className="font-bold text-slate-900 text-sm leading-snug">
-                                  {service.name}
-                                </h4>
-                                <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold text-[10px] whitespace-nowrap">
-                                  {service.category}
-                                </span>
-                              </div>
-
-                              <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">
-                                {service.description || 'Professional laundry service with priority care.'}
-                              </p>
-                            </div>
-
-                            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                              <div>
-                                <span className="text-[10px] uppercase text-slate-400 block font-semibold">Price</span>
-                                <span className="font-black text-slate-900 text-sm font-mono">
-                                  KES {service.basePrice?.toLocaleString()}
-                                  <span className="text-[11px] font-normal text-slate-500 font-sans">
-                                    {service.pricingType === 'per_kg' ? ' / kg' : ''}
-                                  </span>
-                                </span>
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={() => handleBookService(provider, service)}
-                                className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1 cursor-pointer"
-                              >
-                                <span className="material-symbols-outlined text-[15px]">shopping_bag</span>
-                                <span>Book Now</span>
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Real Verified Client Reviews Stream */}
-                  <div className="p-6 md:p-8 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-amber-500 text-[20px]">chat</span>
-                        <h3 className="font-bold text-slate-900 text-sm sm:text-base font-['Geist']">
-                          Verified Client Reviews ({provider.reviews?.length || 0})
-                        </h3>
-                      </div>
-                    </div>
-
-                    {provider.reviews?.length === 0 ? (
-                      <div className="text-xs text-slate-400 py-4 text-center bg-slate-50 rounded-2xl">
-                        No written reviews submitted yet for this cleaner.
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {provider.reviews.map((rev) => (
-                          <div
-                            key={rev._id}
-                            className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs space-y-3 flex flex-col justify-between"
-                          >
-                            <div className="space-y-2">
-                              {/* Header */}
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
-                                    {rev.customerName?.slice(0, 1) || 'C'}
-                                  </div>
-                                  <div>
-                                    <div className="font-bold text-xs text-slate-900">{rev.customerName}</div>
-                                    <div className="text-[10px] text-slate-400">
-                                      {new Date(rev.createdAt).toLocaleDateString()}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="flex text-amber-400">
-                                  {[1, 2, 3, 4, 5].map((s) => (
-                                    <span
-                                      key={s}
-                                      className="material-symbols-outlined text-[14px]"
-                                      style={{
-                                        fontVariationSettings: s <= rev.rating ? "'FILL' 1" : "'FILL' 0"
-                                      }}
-                                    >
-                                      star
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-
-                              {/* Tags */}
-                              {rev.tags?.length > 0 && (
-                                <div className="flex flex-wrap gap-1">
-                                  {rev.tags.map((tag, tIdx) => (
-                                    <span
-                                      key={tIdx}
-                                      className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold text-[10px]"
-                                    >
-                                      {tag}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-
-                              {/* Comment */}
-                              {rev.comment && (
-                                <p className="text-xs text-slate-700 leading-relaxed italic">
-                                  "{rev.comment}"
-                                </p>
-                              )}
-                            </div>
-
-                            {/* Official Reply */}
-                            {rev.reply?.text && (
-                              <div className="p-2.5 rounded-xl bg-blue-50/70 border border-blue-100 text-xs text-blue-900 space-y-1">
-                                <div className="flex items-center gap-1 font-bold text-[11px] text-blue-800">
-                                  <span className="material-symbols-outlined text-[14px]">reply</span>
-                                  <span>{provider.name} (Cleaner Response):</span>
-                                </div>
-                                <p className="text-[11px] leading-relaxed text-blue-950">
-                                  {rev.reply.text}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         )}
-      </main>
+      </div>
     </div>
   );
 }

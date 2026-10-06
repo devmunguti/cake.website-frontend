@@ -1,167 +1,82 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #003ec7;
-  --color-primary-container: #0052ff;
-  --color-on-primary: #ffffff;
-  --color-on-primary-container: #dfe3ff;
-  --color-primary-fixed: #dde1ff;
-  --color-primary-fixed-dim: #b7c4ff;
-  --color-on-primary-fixed: #001452;
-  --color-on-primary-fixed-variant: #0038b6;
+  --color-primary: #C85A32;
+  --color-primary-hover: #B04B25;
+  --color-primary-light: #FDF4F0;
+  --color-primary-container: #FAECE5;
+  --color-on-primary: #FFFFFF;
 
-  --color-secondary: #006688;
-  --color-secondary-container: #00c1fd;
-  --color-on-secondary: #ffffff;
-  --color-on-secondary-container: #004b65;
-  --color-secondary-fixed: #c2e8ff;
-  --color-secondary-fixed-dim: #75d1ff;
-  --color-on-secondary-fixed: #001e2b;
-  --color-on-secondary-fixed-variant: #004d67;
+  --color-secondary: #D97706;
+  --color-secondary-light: #FEF3C7;
+  --color-on-secondary: #FFFFFF;
 
-  --color-tertiary: #494e57;
-  --color-tertiary-container: #61666f;
-  --color-on-tertiary: #ffffff;
-  --color-on-tertiary-container: #e0e4ef;
-  --color-tertiary-fixed: #dee2ed;
-  --color-tertiary-fixed-dim: #c2c6d1;
-  --color-on-tertiary-fixed: #171c23;
-  --color-on-tertiary-fixed-variant: #424750;
+  --color-accent: #E11D48;
+  --color-accent-light: #FFE4E6;
 
-  --color-background: #f9f9fc;
-  --color-on-background: #1a1c1e;
-  --color-surface: #f9f9fc;
-  --color-on-surface: #1a1c1e;
-  --color-surface-dim: #dadadc;
-  --color-surface-bright: #f9f9fc;
-  --color-surface-variant: #e2e2e5;
-  --color-on-surface-variant: #434656;
-  --color-surface-tint: #004ced;
+  --color-espresso: #2C2420;
+  --color-mocha: #4A3E39;
+  --color-cream: #FAF7F2;
+  --color-warm-sand: #F3ECE2;
+  --color-warm-border: #E8DFD3;
 
-  --color-surface-container-lowest: #ffffff;
-  --color-surface-container-low: #f3f3f6;
-  --color-surface-container: #eeeef0;
-  --color-surface-container-high: #e8e8ea;
-  --color-surface-container-highest: #e2e2e5;
+  --color-background: #FAF7F2;
+  --color-surface: #FFFFFF;
+  --color-surface-dim: #F5EFE6;
 
-  --color-outline: #737688;
-  --color-outline-variant: #c3c5d9;
-
-  --color-error: #ba1a1a;
-  --color-on-error: #ffffff;
-  --color-error-container: #ffdad6;
-  --color-on-error-container: #93000a;
-
-  --color-inverse-surface: #2f3133;
-  --color-inverse-on-surface: #f0f0f3;
-  --color-inverse-primary: #b7c4ff;
-
-  --font-body: 'Inter', sans-serif;
-  --font-headline: 'Geist', sans-serif;
-  --font-label: 'Geist', sans-serif;
-
-  --spacing-gutter-mobile: 16px;
-  --spacing-gutter-desktop: 24px;
-  --spacing-margin-mobile: 20px;
-  --spacing-margin-desktop: 40px;
-  --spacing-stack-gap-sm: 8px;
-  --spacing-stack-gap-md: 16px;
-  --spacing-stack-gap-lg: 24px;
-}
-
-/* Custom font utilities for matching Geist/Inter heading styles */
-.font-headline-xl {
-  font-family: 'Geist', sans-serif;
-  font-size: 36px;
-  line-height: 44px;
-  letter-spacing: -0.02em;
-  font-weight: 700;
-}
-
-@media (min-width: 768px) {
-  .font-headline-xl {
-    font-size: 40px;
-    line-height: 48px;
-  }
-}
-
-.font-headline-lg {
-  font-family: 'Geist', sans-serif;
-  font-size: 28px;
-  line-height: 36px;
-  letter-spacing: -0.01em;
-  font-weight: 600;
-}
-
-@media (min-width: 768px) {
-  .font-headline-lg {
-    font-size: 32px;
-    line-height: 40px;
-  }
-}
-
-.font-headline-md {
-  font-family: 'Geist', sans-serif;
-  font-size: 22px;
-  line-height: 28px;
-  font-weight: 600;
-}
-
-@media (min-width: 768px) {
-  .font-headline-md {
-    font-size: 24px;
-    line-height: 32px;
-  }
-}
-
-.font-label-md {
-  font-family: 'Geist', sans-serif;
-  font-size: 14px;
-  line-height: 20px;
-  font-weight: 500;
-}
-
-.font-label-sm {
-  font-family: 'Geist', sans-serif;
-  font-size: 12px;
-  line-height: 16px;
-  font-weight: 600;
-}
-
-.font-body-lg {
-  font-family: 'Inter', sans-serif;
-  font-size: 18px;
-  line-height: 28px;
-  font-weight: 400;
-}
-
-.font-body-md {
-  font-family: 'Inter', sans-serif;
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 400;
-}
-
-.font-body-sm {
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
-  line-height: 20px;
-  font-weight: 400;
+  --font-serif: 'Playfair Display', Georgia, serif;
+  --font-sans: 'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif;
 }
 
 body {
   margin: 0;
   padding: 0;
-  font-family: 'Inter', sans-serif;
-  background-color: #f9f9fc;
-  color: #1a1c1e;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  background-color: #FAF7F2;
+  color: #2C2420;
+  -webkit-font-smoothing: antialiased;
 }
 
 #root {
   width: 100%;
   min-height: 100vh;
-  margin: 0;
-  padding: 0;
+}
+
+.font-serif-display {
+  font-family: 'Playfair Display', Georgia, serif;
+}
+
+/* Glassmorphism & Cake Card Styles */
+.cake-card {
+  background: #FFFFFF;
+  border: 1px solid #EFE8DE;
+  border-radius: 20px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cake-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 30px -10px rgba(180, 83, 9, 0.12), 0 10px 15px -5px rgba(0, 0, 0, 0.04);
+  border-color: #E2D3C0;
+}
+
+.glass-nav {
+  background: rgba(250, 247, 242, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(226, 211, 192, 0.6);
+}
+
+.badge-gold {
+  background: linear-gradient(135deg, #FDE68A 0%, #D97706 100%);
+  color: #78350F;
+  font-weight: 700;
+}
+
+.badge-artisan {
+  background: #FAECE5;
+  color: #C85A32;
+  font-weight: 600;
 }
 
 /* Material symbols adjustments */
@@ -169,16 +84,20 @@ body {
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
 
-/* Mobile Safe Area Insets & Touch Helpers */
-.pb-safe {
-  padding-bottom: max(16px, env(safe-area-inset-bottom));
+/* Smooth custom scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
-.pt-safe {
-  padding-top: max(16px, env(safe-area-inset-top));
+::-webkit-scrollbar-track {
+  background: #FAF7F2;
 }
-.touch-target {
-  min-height: 44px;
-  min-width: 44px;
+::-webkit-scrollbar-thumb {
+  background: #D8CCC0;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #BFAFA0;
 }
 
 /* Accessibility: Reduced Motion Support */

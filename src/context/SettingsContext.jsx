@@ -5,12 +5,16 @@ const SettingsContext = createContext(null);
 
 export const SettingsProvider = ({ children }) => {
   const [settings, setSettings] = useState({
-    platformName: 'Laundry',
-    supportEmail: 'support@auralaundry.co.ke',
-    supportPhone: '+254 700 000 000',
-    logoUrl: '',
-    commissionRate: 15,
-    minimumPayoutThreshold: 5000,
+    platformName: 'Sweet Delights Bakery',
+    supportEmail: 'orders@sweetdelightsbakery.co.ke',
+    supportPhone: '+254 700 123 456',
+    storeAddress: '1st Avenue, Parklands / Westlands, Nairobi, Kenya',
+    currency: 'KES',
+    defaultDeliveryFee: 350,
+    freeDeliveryThreshold: 6000,
+    minimumLeadTimeHours: 24,
+    openingTime: '08:00 AM',
+    closingTime: '07:00 PM',
     maintenanceMode: false
   });
   const [loading, setLoading] = useState(true);
@@ -28,7 +32,7 @@ export const SettingsProvider = ({ children }) => {
         }
       }
     } catch (error) {
-      console.error('Failed to load public platform settings:', error);
+      console.warn('Could not load public platform settings, using defaults');
     } finally {
       setLoading(false);
     }
@@ -37,8 +41,7 @@ export const SettingsProvider = ({ children }) => {
   useEffect(() => {
     refreshSettings();
 
-    // Listen for HTTP 503 MAINTENANCE_MODE interceptor events
-    const handleMaintenanceEvent = (event) => {
+    const handleMaintenanceEvent = () => {
       setMaintenanceTriggered(true);
     };
 
